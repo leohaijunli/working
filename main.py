@@ -18,6 +18,8 @@ logging.basicConfig(
 
 # ==================== 配置常量 ====================
 VIDEO_SRC = "7.mp4"
+#VIDEO_SRC = "rtsp://192.168.1.91:8554/video"
+#VIDEO_SRC = "rtsp://10.0.0.129:8554/interceptor"
 RTSP_TARGET = "rtsp://127.0.0.1:8554/live/mystream"
 TARGET_FPS = 30
 FRAME_TIME = 1.0 / TARGET_FPS

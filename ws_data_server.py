@@ -163,7 +163,8 @@ class RerunVisualizer:
             # 标签
             class_name = det.get("class_name") or det.get("label") or "target"
             conf = det.get("confidence", 0.0)
-            labels.append(f"{class_name} {conf:.2f}")
+            #labels.append(f"{class_name} {conf:.2f}")
+            labels.append(class_name)  # 仅显示类别名称
             
             # 颜色 (红色)
             colors.append([255, 0, 0])
