@@ -9,6 +9,8 @@ from typing import Optional
 from stream_controller import StreamController
 from video_source import UniversalVideoSource
 from ws_data_server import RerunVisualizer
+import rerun as rr
+import cv2
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,8 +26,13 @@ VIDEO_SRC = 0 # 使用摄像头,也可以替换为视频文件路径或 RTSP URL
 RTSP_TARGET = "rtsp://127.0.0.1:8554/live/mystream"
 TARGET_FPS = 30
 FRAME_TIME = 1.0 / TARGET_FPS
-VIDEO_WIDTH = 640
-VIDEO_HEIGHT = 480
+VIDEO_WIDTH = 1456
+VIDEO_HEIGHT = 1088
+VIDEO_FPS = 30
+
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+output_video = cv2.VideoWriter('output_video.mp4', fourcc, VIDEO_FPS, (VIDEO_WIDTH, VIDEO_HEIGHT))
+
 HEF_PATH = "yolov11n.hef"
 CONF_THRESHOLD = 0.2
 
@@ -151,6 +158,15 @@ class MotionTerminalApp:
         retry_count = 0
         max_retries = 5
         
+        # specify the log file to save
+        # spawn=False means no need to display on local screen.
+    
+        save_path = "rpi5_video.rrd"
+        rr.init("UAV_Tracker", spawn=False)
+        rr.save(save_path) 
+        print(f"💾 Rerun log saved to: {save_path}")
+        frame_count = 0
+        
         try:
             while self.video_source.is_opened:
                 # 读取帧
@@ -182,6 +198,8 @@ class MotionTerminalApp:
                 
                 # 更新 FPS
                 current_fps = self.fps_counter.tick()
+                output_video.write(frame)
+
                 
                 # # 定期打印状态
                 frame_count = self.visualizer.get_frame_count()
