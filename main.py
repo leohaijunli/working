@@ -8,7 +8,6 @@ import logging
 from typing import Optional
 from stream_controller import StreamController
 from video_source import UniversalVideoSource
-from hailo_detector import HailoDetector
 from ws_data_server import RerunVisualizer
 
 logging.basicConfig(
@@ -17,7 +16,9 @@ logging.basicConfig(
 )
 
 # ==================== 配置常量 ====================
-VIDEO_SRC = "7.mp4"
+VIDEO_SRC = 0 # 使用摄像头,也可以替换为视频文件路径或 RTSP URL
+
+#VIDEO_SRC = "7.mp4"
 #VIDEO_SRC = "rtsp://192.168.1.91:8554/video"
 #VIDEO_SRC = "rtsp://10.0.0.129:8554/interceptor"
 RTSP_TARGET = "rtsp://127.0.0.1:8554/live/mystream"
@@ -119,13 +120,13 @@ class MotionTerminalApp:
             )
             self.streamer.start()
             
-            # 4. 初始化检测器
-            logging.info("🤖 初始化检测器...")
-            self.detector = HailoDetector(
-                hef_path=HEF_PATH,
-                conf_threshold=CONF_THRESHOLD,
-                verbose=False
-            )
+            # # 4. 初始化检测器
+            # logging.info("🤖 初始化检测器...")
+            # self.detector = HailoDetector(
+            #     hef_path=HEF_PATH,
+            #     conf_threshold=CONF_THRESHOLD,
+            #     verbose=False
+            # )
             
             # 5. FPS 计数器
             self.fps_counter = FPSCounter(target_fps=TARGET_FPS)
@@ -167,28 +168,29 @@ class MotionTerminalApp:
                 
                 retry_count = 0  # 重置重试计数
                 
-                # 执行检测
-                result = self.detector._detect_from_array(frame)
-                output_frame = result["output_image"]
-                detections = result.get("results", [])
+                # # 执行检测
+                # result = self.detector._detect_from_array(frame)
+                # output_frame = result["output_image"]
+                # detections = result.get("results", [])
                 
                 # Rerun 可视化
-                self.visualizer.log_frame(frame, detections)
+                self.visualizer.log_frame(frame)
                 
                 # RTSP 推流
+                output_frame = frame
                 self.streamer.push_frame(output_frame)
                 
                 # 更新 FPS
                 current_fps = self.fps_counter.tick()
                 
-                # 定期打印状态
+                # # 定期打印状态
                 frame_count = self.visualizer.get_frame_count()
-                if frame_count % 50 == 0:
-                    logging.info(
-                        f"✅ Frame: {frame_count} | "
-                        f"FPS: {current_fps:.1f} | "
-                        f"Detections: {len(detections)}"
-                    )
+                # if frame_count % 50 == 0:
+                #     logging.info(
+                #         f"✅ Frame: {frame_count} | "
+                #         f"FPS: {current_fps:.1f} | "
+                #         f"Detections: {len(detections)}"
+                #     )
                 
                 # 帧率控制
                 self.fps_counter.sleep_to_maintain_fps()

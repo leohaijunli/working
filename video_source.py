@@ -24,7 +24,7 @@ import cv2
 class UniversalVideoSource:
     def __init__(self, source=0, width=640, height=480, fps=25):
         self._source = source
-        self.is_pi_camera = False
+        self.is_pi_camera = True
         self._width = width
         self._height = height
         self._fps = fps
