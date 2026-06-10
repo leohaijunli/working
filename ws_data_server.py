@@ -124,8 +124,8 @@ class RerunVisualizer:
                 rr.log("camera/image/detections", rr.Clear(recursive=False))
             
             # 3. 系统状态指示器
-            if show_status:
-                self._log_status()
+            # if show_status:
+            #     self._log_status()
             
             # 首帧或定期打印确认信息
             if self.frame_count == 1:

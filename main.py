@@ -28,10 +28,19 @@ TARGET_FPS = 30
 FRAME_TIME = 1.0 / TARGET_FPS
 VIDEO_WIDTH = 1456
 VIDEO_HEIGHT = 1088
+# VIDEO_WIDTH = 640
+# VIDEO_HEIGHT = 480
 VIDEO_FPS = 30
 
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-output_video = cv2.VideoWriter('output_video.mp4', fourcc, VIDEO_FPS, (VIDEO_WIDTH, VIDEO_HEIGHT))
+fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+
+# 确保 VIDEO_WIDTH 和 VIDEO_HEIGHT 是整数
+output_video = cv2.VideoWriter(
+    'output_video.avi', 
+    fourcc, 
+    float(VIDEO_FPS), 
+    (int(VIDEO_WIDTH), int(VIDEO_HEIGHT))
+)
 
 HEF_PATH = "yolov11n.hef"
 CONF_THRESHOLD = 0.2
@@ -157,15 +166,15 @@ class MotionTerminalApp:
         """主循环"""
         retry_count = 0
         max_retries = 5
-        
+        frame_count = 0
+
         # specify the log file to save
         # spawn=False means no need to display on local screen.
     
-        save_path = "rpi5_video.rrd"
-        rr.init("UAV_Tracker", spawn=False)
-        rr.save(save_path) 
-        print(f"💾 Rerun log saved to: {save_path}")
-        frame_count = 0
+        # save_path = "rpi5_video.rrd"
+        # rr.init("UAV_Tracker", spawn=False)
+        # rr.save(save_path) 
+        # print(f"💾 Rerun log saved to: {save_path}")
         
         try:
             while self.video_source.is_opened:
@@ -198,6 +207,8 @@ class MotionTerminalApp:
                 
                 # 更新 FPS
                 current_fps = self.fps_counter.tick()
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                #rr.log("video/original", rr.Image(frame_rgb))
                 output_video.write(frame)
 
                 
