@@ -78,7 +78,7 @@ class MotionTerminalApp:
             logging.info("📡 Starting RTSP stream...")
             self.streamer = StreamController(
                 rtsp_url=RTSP_TARGET,
-                res=(VIDEO_WIDTH, VIDEO_HEIGHT),
+                stream_res=(VIDEO_WIDTH, VIDEO_HEIGHT),
                 fps=TARGET_FPS
             )
             self.streamer.start()

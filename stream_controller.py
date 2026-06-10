@@ -5,13 +5,12 @@ import time
 import json
 import cv2
 from datetime import datetime, timezone
-import signal
 
 
 class StreamController:
-    def __init__(self, rtsp_url, res=(1280, 720), fps=25):
+    def __init__(self, rtsp_url, stream_res=(1280, 720), fps=25):
         self.rtsp_url = rtsp_url
-        self.res = res
+        self.stream_res = stream_res  # 推流分辨率
         self.fps = fps
         self.pipe = None
         self.metadata = []
@@ -24,13 +23,9 @@ class StreamController:
         self._stream_queue = queue.Queue(maxsize=10)
         self._record_queue = queue.Queue(maxsize=10)
 
-        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-        self.output_video = cv2.VideoWriter(
-            'output_video.avi',
-            fourcc,
-            float(self.fps),
-            (int(self.res[0]), int(self.res[1]))
-        )
+        # VideoWriter 在第一帧才初始化，因为这时才知道原始分辨率
+        self.output_video = None
+        self._record_res = None
 
         self._stream_thread = threading.Thread(target=self._stream_worker, daemon=True)
         self._record_thread = threading.Thread(target=self._record_worker, daemon=True)
@@ -46,7 +41,9 @@ class StreamController:
         ffmpeg_cmd = [
             'ffmpeg', '-y',
             '-f', 'rawvideo', '-vcodec', 'rawvideo',
-            '-pix_fmt', 'bgr24', '-s', f"{self.res[0]}x{self.res[1]}", '-r', str(self.fps),
+            '-pix_fmt', 'bgr24',
+            '-s', f"{self.stream_res[0]}x{self.stream_res[1]}",
+            '-r', str(self.fps),
             '-i', '-',
             '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
             '-b:v', '5000k', '-bufsize', '500k', '-g', str(self.fps),
@@ -81,6 +78,19 @@ class StreamController:
         finally:
             with self._lock:
                 self._restarting = False
+
+    def _init_video_writer(self, frame):
+        """根据第一帧的实际尺寸初始化 VideoWriter。"""
+        h, w = frame.shape[:2]
+        self._record_res = (w, h)
+        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+        self.output_video = cv2.VideoWriter(
+            'output_video.avi',
+            fourcc,
+            float(self.fps),
+            self._record_res
+        )
+        print(f"📼 [Record] VideoWriter initialized at {w}x{h}")
 
     def _stream_worker(self):
         """推流线程：从队列取帧写入 FFmpeg stdin。"""
@@ -128,6 +138,11 @@ class StreamController:
                 break
 
             frame, utc_time = item
+
+            # 懒初始化 VideoWriter
+            if self.output_video is None:
+                self._init_video_writer(frame)
+
             self.output_video.write(frame)
             self.metadata.append({
                 "frame_idx": record_idx,
@@ -137,17 +152,23 @@ class StreamController:
             self._record_queue.task_done()
 
     def push_frame(self, frame):
-        """Resize and dispatch frame to both worker queues."""
-        out_frame = cv2.resize(frame, self.res)
+        """
+        接收原始分辨率的帧：
+        - 推流队列：resize 到 stream_res
+        - 录制队列：保持原始分辨率
+        """
         utc_time = datetime.now(timezone.utc).isoformat()
 
+        # 推流：resize
+        stream_frame = cv2.resize(frame, self.stream_res)
         try:
-            self._stream_queue.put_nowait(out_frame)
+            self._stream_queue.put_nowait(stream_frame)
         except queue.Full:
             print(f"⚠️ [Stream] Stream queue full, push #{self._push_count} dropped")
 
+        # 录制：原始尺寸
         try:
-            self._record_queue.put_nowait((out_frame, utc_time))
+            self._record_queue.put_nowait((frame.copy(), utc_time))
         except queue.Full:
             print(f"⚠️ [Record] Record queue full, push #{self._push_count} dropped")
 
@@ -185,7 +206,8 @@ class StreamController:
                 self.pipe.kill()
 
         print(f"[Stop] 6. releasing VideoWriter")
-        self.output_video.release()
+        if self.output_video is not None:
+            self.output_video.release()
 
         print(f"[Stop] 7. saving metadata, len={len(self.metadata)}")
         try:
@@ -195,26 +217,3 @@ class StreamController:
         except OSError as e:
             print(f"❌ [Stream] Failed to save metadata: {e}")
         print(f"[Stop] 8. done")
-
-
-if __name__ == "__main__":
-    RTSP_URL = "rtsp://localhost:8554/live"
-    cap = cv2.VideoCapture(0)
-
-    controller = StreamController(rtsp_url=RTSP_URL)
-    controller.start()
-
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("❌ [Main] Failed to read frame")
-                break
-            controller.push_frame(frame)
-
-    except KeyboardInterrupt:
-        print("\n[Main] Ctrl+C received")
-
-    finally:
-        cap.release()
-        controller.stop()
