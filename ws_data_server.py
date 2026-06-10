@@ -1,6 +1,6 @@
 """
-Rerun 可视化管理器
-提供视频流和检测结果的实时可视化功能
+Rerun visualization manager.
+Provides real-time visualization of video streams and detection results.
 """
 
 import cv2
@@ -18,7 +18,7 @@ logging.basicConfig(
 
 
 class RerunVisualizer:
-    """优化的 Rerun 可视化管理器"""
+    """Optimized Rerun visualization manager."""
     
     def __init__(
         self, 
@@ -27,12 +27,12 @@ class RerunVisualizer:
         video_height: int = 480
     ):
         """
-        初始化 Rerun 可视化器
+        Initialize the Rerun visualizer.
         
         Args:
-            app_name: 应用名称
-            video_width: 视频宽度
-            video_height: 视频高度
+            app_name: Application name.
+            video_width: Video width.
+            video_height: Video height.
         """
         self.app_name = app_name
         self.video_width = video_width
@@ -43,29 +43,29 @@ class RerunVisualizer:
         
     def initialize(self) -> str:
         """
-        初始化 Rerun 服务并返回本机 IP
-        
+        Initialize the Rerun service and return the local IP.
+
         Returns:
-            本机局域网 IP 地址
+            Local LAN IP address.
         """
         if self._initialized:
-            logging.warning("Rerun 已经初始化,跳过重复初始化")
+            logging.warning("Rerun is already initialized; skipping redundant initialization")
             return self._get_local_ip()
         
         rr.init(self.app_name, spawn=False)
         
-        # 获取本机 IP
+        # Get the local IP address
         local_ip = self._get_local_ip()
         
-        # 启动服务
+        # Start the service
         server_uri = rr.serve_grpc()
         rr.serve_web_viewer(connect_to=server_uri)
         
         self._initialized = True
         
         logging.info("=" * 60)
-        logging.info("🌐 Rerun 服务已启动")
-        logging.info(f"🌐 网页查看: http://{local_ip}:9090")
+        logging.info("🌐 Rerun service started")
+        logging.info(f"🌐 Web viewer: http://{local_ip}:9090")
         logging.info("=" * 60)
         
         return local_ip
@@ -73,17 +73,17 @@ class RerunVisualizer:
     @staticmethod
     def _get_local_ip() -> str:
         """
-        获取本机局域网 IP
-        
+        Get the local LAN IP address.
+
         Returns:
-            IP 地址字符串
+            IP address string.
         """
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
                 return s.getsockname()[0]
         except Exception as e:
-            logging.warning(f"获取本机 IP 失败: {e}, 使用默认值")
+            logging.warning(f"Failed to get local IP: {e}, using default")
             return "127.0.0.1"
     
     def log_frame(
@@ -93,65 +93,65 @@ class RerunVisualizer:
         show_status: bool = True
     ):
         """
-        记录单帧数据到 Rerun
+        Log a single frame to Rerun.
         
         Args:
-            frame: BGR 格式的图像 (OpenCV 格式)
-            detections: 检测结果列表,格式为:
+            frame: Image in BGR format (OpenCV format).
+            detections: List of detection results, in the format:
                 [{"x1": float, "y1": float, "x2": float, "y2": float,
                   "class_name": str, "confidence": float}, ...]
-            show_status: 是否显示系统状态框
+            show_status: Whether to display the system status overlay.
         """
         if not self._initialized:
-            logging.error("Rerun 未初始化,请先调用 initialize()")
+            logging.error("Rerun is not initialized; call initialize() first")
             return
         
         with self._lock:
             self.frame_count += 1
             
-            # 设置时间轴
+            # Set the timeline
             rr.set_time("frame", sequence=self.frame_count)
             
-            # 1. 记录图像 (转为 RGB)
+            # 1. Log image (convert to RGB)
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             rr.log("camera/image", rr.Image(frame_rgb))
             
-            # 2. 记录检测框
+            # 2. Log detections
             if detections:
                 self._log_detections(detections)
             else:
-                # 清除之前的检测框
+                # Clear previous detections
                 rr.log("camera/image/detections", rr.Clear(recursive=False))
             
-            # 3. 系统状态指示器
+            # 3. System status indicator
             # if show_status:
             #     self._log_status()
             
-            # 首帧或定期打印确认信息
+            # Log confirmation for the first frame or periodically
             if self.frame_count == 1:
-                logging.info("📤 首帧数据已发送到 Rerun")
+                logging.info("📤 First frame sent to Rerun")
             elif self.frame_count % 100 == 0:
-                logging.debug(f"✅ 已记录第 {self.frame_count} 帧")
+                logging.debug(f"✅ Logged frame {self.frame_count}")
     
     def _log_detections(self, detections: List[Dict]):
         """
-        记录检测框到 Rerun
+        Log detection boxes to Rerun.
         
         Args:
-            detections: 检测结果列表
+            detections: List of detection results.
         """
         bboxes = []
         labels = []
         colors = []
         
         for det in detections:
-            # 提取坐标
+            # Extract coordinates
             x1 = float(det.get("x1", 0))
             y1 = float(det.get("y1", 0))
             x2 = float(det.get("x2", 0))
             y2 = float(det.get("y2", 0))
             
-            # 归一化坐标转换为像素坐标
+            # Convert normalized coordinates to pixel coordinates
             if x2 <= 1.0:
                 x1 *= self.video_width
                 x2 *= self.video_width
@@ -160,13 +160,13 @@ class RerunVisualizer:
             
             bboxes.append([x1, y1, x2, y2])
             
-            # 标签
+            # Label
             class_name = det.get("class_name") or det.get("label") or "target"
             conf = det.get("confidence", 0.0)
             #labels.append(f"{class_name} {conf:.2f}")
-            labels.append(class_name)  # 仅显示类别名称
+            labels.append(class_name)  # Show only the class name
             
-            # 颜色 (红色)
+            # Color (red)
             colors.append([255, 0, 0])
         
         rr.log(
@@ -179,12 +179,12 @@ class RerunVisualizer:
             )
         )
         
-        # 首次检测时打印信息
+        # Log info on first detections
         if self.frame_count <= 3:
-            logging.info(f"   检测到 {len(bboxes)} 个目标")
+            logging.info(f"   Detected {len(bboxes)} targets")
     
     def _log_status(self):
-        """记录系统状态指示器"""
+        """Log system status indicator."""
         rr.log(
             "camera/image/status",
             rr.Boxes2D(
@@ -196,11 +196,11 @@ class RerunVisualizer:
         )
     
     def get_frame_count(self) -> int:
-        """获取当前帧计数"""
+        """Get the current frame count."""
         return self.frame_count
     
     def reset(self):
-        """重置帧计数"""
+        """Reset the frame count."""
         with self._lock:
             self.frame_count = 0
-            logging.info("Rerun 帧计数已重置")
+            logging.info("Rerun frame count reset")

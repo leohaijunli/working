@@ -343,63 +343,63 @@ class HailoPythonInferenceEngine:
                 if verbose: print(f"[STAGE 2] Parsing Hardware NMS Data...")
                 t_post = time.perf_counter()
                 
-                # 1. 提取最深层的 NumPy 数组
-                # 路径：hailo_results -> [key] -> list[0] -> list[0] -> array
+                # 1. Extract the deepest NumPy array
+                # Path: hailo_results -> [key] -> list[0] -> list[0] -> array
                 node_name = 'yolov11n/yolov8_nms_postprocess'
                 raw_list_wrapper = hailo_results.get(node_name, [])
                 
                 detections = []
 
                 if isinstance(raw_list_wrapper, list) and len(raw_list_wrapper) > 0:
-                    # 关键：根据你的 DEBUG 显示，数据在 raw_list_wrapper[0][0]
-                    # 因为你的 DEBUG 打印出的是 [array([...])]
+                    # Key: based on debug output, the data is in raw_list_wrapper[0][0]
+                    # Because debug printed [array([...])]
                     inner_data = raw_list_wrapper[0]
                     
-                    # 再次检查是否还嵌套了一层 list
+                    # Check again if there is an additional nested list
                     if isinstance(inner_data, list) and len(inner_data) > 0:
-                        nms_array = inner_data[0] # 这才是真正的 numpy array
+                        nms_array = inner_data[0]  # This is the actual NumPy array
                     else:
                         nms_array = inner_data
 
                     if hasattr(nms_array, 'shape') and nms_array.ndim >= 2:
-                        # 你的 DEBUG 显示每一行有 5 个元素: [ymin, xmin, ymax, xmax, confidence]
-                        # YOLOv11 这种单类模型通常不输出 class_id，默认为 0
-                        # 定义你的类别映射（如果你只有一类，直接写死即可）
+                        # Debug shows each row has 5 elements: [ymin, xmin, ymax, xmax, confidence]
+                        # YOLOv11 single-class models usually omit class_id, default to 0
+                        # Define your class mapping (if only one class, hardcode it)
                         CLASS_NAMES = {0: 'Target'} 
 
                         for row in nms_array:
-                            # 提取置信度（第 5 个元素，索引为 4）
+                            # Extract confidence (5th element, index 4)
                             current_conf = float(row[4])
                             
                             if current_conf >= conf_threshold:
-                                # 提取类 ID（如果有的话，通常在索引 5，没有则默认为 0）
+                                # Extract class ID (if present, usually at index 5; otherwise default to 0)
                                 current_class_id = int(row[5]) if len(row) > 5 else 0
                                 
-                                # 构建一个包含所有可能字段的字典，确保 draw_bboxes 不再报错
+                                # Build a dict with all possible fields to avoid draw_bboxes errors
                                 detections.append({
-                                    # 坐标字段
+                                    # Coordinate fields
                                     'x1': row[1] * 640,
                                     'y1': row[0] * 640,
                                     'x2': row[3] * 640,
                                     'y2': row[2] * 640,
                                     
-                                    # 置信度字段 (把可能的缩写全填上)
+                                    # Confidence fields (include all common abbreviations)
                                     'conf': current_conf,
                                     'confidence': current_conf,
                                     'score': current_conf,
                                     
-                                    # 类别字段
+                                    # Class fields
                                     'class_id': current_class_id,
                                     'cls_id': current_class_id,
-                                    'cls_name': 'Target', # 你可以改为 'Drone'
+                                    'cls_name': 'Target', # You can change this to 'Drone'
                                     
-                                    # 标签字段
+                                    # Label fields
                                     'label': f"Target: {current_conf:.2f}"
                                 })
                         if verbose: print(f"  ✓ Extracted {len(detections)} valid objects from array.")
                 
                 else:
-                    # 如果不是列表，尝试原来的 Python Head (针对旧模型)
+                    # If not a list, try the original Python head (for older models)
                     if verbose: print(f"  ✓ No NMS list found, trying Python Head...")
                     detections = self._run_python_head(hailo_results, conf_threshold)
 

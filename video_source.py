@@ -168,7 +168,7 @@ class UniversalVideoSource:
             self._is_rtsp = is_rtsp
 
             if is_rtsp:
-                # 强制 TCP 传输，避免 UDP 丢包
+                # Force TCP transport to reduce UDP packet loss
                 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
                 self._cv_cap = cv.VideoCapture(self._source, cv.CAP_FFMPEG)
             else:
@@ -178,7 +178,7 @@ class UniversalVideoSource:
                 logger.error(f"OpenCV: failed to open source {self._source}")
                 return False
 
-            # RTSP 流没有固定 FPS，直接用配置值；本地文件读原始 FPS
+            # RTSP streams do not always have a fixed FPS, so use the configured value; local files use the source FPS
             if is_rtsp:
                 actual_fps = self._cv_cap.get(cv.CAP_PROP_FPS)
                 self._fps = actual_fps if actual_fps > 0 else self._fps
@@ -190,7 +190,7 @@ class UniversalVideoSource:
 
             self._cv_cap.set(cv.CAP_PROP_FRAME_WIDTH, self._width)
             self._cv_cap.set(cv.CAP_PROP_FRAME_HEIGHT, self._height)
-            self._cv_cap.set(cv.CAP_PROP_BUFFERSIZE, 1)  # 减少延迟
+            self._cv_cap.set(cv.CAP_PROP_BUFFERSIZE, 1)  # Reduce latency
 
             actual_w = int(self._cv_cap.get(cv.CAP_PROP_FRAME_WIDTH))
             actual_h = int(self._cv_cap.get(cv.CAP_PROP_FRAME_HEIGHT))
@@ -274,12 +274,12 @@ class UniversalVideoSource:
         return True, self._frame
 
     def _capture_loop_picamera2(self):
-        """background thread for capturing frames with Picamera2."""
+        """Background thread for capturing frames with Picamera2."""
         logger.debug("Camera capture [Picamera2]: start")
 
         while self._running and self._picam:
             try:
-                # capture_array возвращает BGR888 numpy array
+                # capture_array returns a BGR888 numpy array
                 frame = self._picam.capture_array("main")
 
                 if frame is not None:
@@ -319,16 +319,16 @@ class UniversalVideoSource:
                 consecutive_fail += 1
                 if consecutive_fail > 5:
                     if self._is_rtsp:
-                        # RTSP 断线 → 重连
+                        # RTSP disconnected → reconnect
                         logger.warning("RTSP stream lost, reconnecting in 2s...")
                         self._cv_cap.release()
                         self._cv_cap = None
                         time.sleep(2.0)
                         if self._running:
                             self._open_opencv(is_rtsp=True)
-                        return  # 新捕获线程已在 _open_opencv 中启动
+                        return  # A new capture thread has been started in _open_opencv
                     else:
-                        # 本地文件结束 → 从头播放
+                        # Local file ended → loop playback from the beginning
                         logger.info("Video file ended, looping from start [OpenCV]")
                         self._cv_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     consecutive_fail = 0
