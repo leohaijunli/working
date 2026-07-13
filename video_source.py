@@ -111,10 +111,11 @@ class UniversalVideoSource:
             config = self._picam.create_video_configuration(
                 main={
                     "size": (self._width, self._height),
-                    "format": "BGR888",  # BGR for yolo, OpenCV compability
+                    "format": "RGB888",  # BGR for yolo, OpenCV compability
                 },
                 controls={
                     "FrameRate": self._fps,
+                    "FrameDurationLimits": (1e6/self._fps, 1e6/self._fps)
                 },
                 buffer_count=2,  # minimal buffering for low latency
             )
@@ -122,7 +123,7 @@ class UniversalVideoSource:
             self._picam.start()
 
             # time for camera to intialize ISP and auto-exposure to stabilize
-            time.sleep(1.0)
+            time.sleep(2.0)
 
             # actual sensor resolution
             camera_props = self._picam.camera_properties
@@ -276,9 +277,14 @@ class UniversalVideoSource:
     def _capture_loop_picamera2(self):
         """Background thread for capturing frames with Picamera2."""
         logger.debug("Camera capture [Picamera2]: start")
-
+        frame_interval = 1.0 / self._fps
+        last_capture_time = time.time()
         while self._running and self._picam:
             try:
+                now = time.time()
+                if now - last_capture_time < frame_interval:
+                    time.sleep(0.001)  # 轻量睡眠，避免 CPU 100%
+                    continue
                 # capture_array returns a BGR888 numpy array
                 frame = self._picam.capture_array("main")
 
@@ -287,6 +293,7 @@ class UniversalVideoSource:
                         self._frame = frame
                         self._frame_id += 1
                     self._update_fps()
+                    last_capture_time = now
 
             except Exception as e:
                 logger.error(f"capture error Picamera2: {e}")
